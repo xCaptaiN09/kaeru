@@ -221,8 +221,8 @@ def main():
     with open(args.lk, 'rb') as fp:
         lk = mmap.mmap(fp.fileno(), 0, access=mmap.ACCESS_READ)
 
-    base = get_load_addr(lk)
-    if not base:
+    base = 0x48200000 + 0x200  # RMX3031 hardcoded
+    if False:  # base hardcoded
         return
     print('CONFIG_BOOTLOADER_BASE=0x%X' % base)
 
