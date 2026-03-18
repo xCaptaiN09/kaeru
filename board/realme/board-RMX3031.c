@@ -20,6 +20,14 @@ void board_early_init(void) {
         FORCE_RETURN(addr, 0);
     }
 
+
+    // Spoof verified boot state to GREEN (locked)
+    // Forces lock state getter to always return 0 (verified/locked)
+    addr = SEARCH_PATTERN(LK_START, LK_END, 0x4B09, 0x447B, 0x685A, 0xB10A);
+    if (addr) {
+        printf("Found get_verified_boot_state at 0x%08X\n", addr);
+        FORCE_RETURN(addr, 0);
+    }
     // Volume key boot mode selection
     if (mtk_detect_key(VOLUME_UP)) {
         set_bootmode(BOOTMODE_RECOVERY);
