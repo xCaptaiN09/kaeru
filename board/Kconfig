@@ -396,3 +396,6 @@ menu "Device Support"
         help
           Say Y if you want to include support for Realme X7 Max
 endmenu
+
+config TECNO_LE7
+    bool "Tecno Pova 2 (LE7)"
