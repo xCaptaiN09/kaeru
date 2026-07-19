@@ -8,7 +8,6 @@
 #define VOLUME_UP 17
 #define VOLUME_DOWN 1
 
-// Spoof flag stored in unused RAM area near bootmode
 #define BLDR_SPOOF_MAGIC 0xB1D05F00
 #define BLDR_SPOOF_ADDR  (CONFIG_BOOTMODE_ADDRESS + 0x4)
 
@@ -38,6 +37,22 @@ static void cmd_bldr_spoof(const char *arg, void *data, unsigned size) {
     }
 }
 
+// Safely return 0 from a function that starts with push {r3, lr}
+static void safe_return_r3(uint32_t addr) {
+    uint16_t *p = (uint16_t *)addr;
+    p[0] = 0x2000; // movs r0, #0
+    p[1] = 0xE8BD; // pop.w
+    p[2] = 0x0800; // {r3, pc}
+}
+
+// Safely return 0 from dm_verity (push {r4, r5, lr} + sub sp, #0xc)
+static void safe_return_dm_verity(uint32_t addr) {
+    uint16_t *p = (uint16_t *)addr;
+    p[0] = 0x2000; // movs r0, #0
+    p[1] = 0xB003; // add sp, #0xc
+    p[2] = 0xBD30; // pop {r4, r5, pc}
+}
+
 void board_early_init(void) {
     printf("Entering early init for Realme X7 Max (RMX3031)\n");
 
@@ -47,7 +62,7 @@ void board_early_init(void) {
     addr = SEARCH_PATTERN(LK_START, LK_END, 0xB508, 0xF7C6, 0xFB0B, 0xF7C6, 0xFAFD);
     if (addr) {
         printf("Found fastboot_unlock_verify at 0x%08X\n", addr);
-        FORCE_RETURN(addr, 0);
+        safe_return_r3(addr);
     }
 
     // Spoof verified boot state to GREEN if bldr_spoof is enabled
@@ -55,7 +70,7 @@ void board_early_init(void) {
         addr = SEARCH_PATTERN(LK_START, LK_END, 0x4B09, 0x447B, 0x685A, 0xB10A);
         if (addr) {
             printf("Found get_verified_boot_state at 0x%08X\n", addr);
-            FORCE_RETURN(addr, 0);
+            FORCE_RETURN(addr, 0); // Safe here because no stack push in fast path
         }
     }
 
@@ -79,14 +94,14 @@ void board_late_init(void) {
     addr = SEARCH_PATTERN(LK_START, LK_END, 0xB508, 0x4B1C, 0x447B, 0x681B, 0x681B);
     if (addr) {
         printf("Found orange_state_warning at 0x%08X\n", addr);
-        FORCE_RETURN(addr, 0);
+        safe_return_r3(addr);
     }
 
     // Remove dm-verity corruption warning
     addr = SEARCH_PATTERN(LK_START, LK_END, 0xB530, 0xB083, 0xAB02, 0x2200, 0x4604);
     if (addr) {
         printf("Found dm_verity_corruption at 0x%08X\n", addr);
-        FORCE_RETURN(addr, 0);
+        safe_return_dm_verity(addr);
     }
 
     if (get_bootmode() != BOOTMODE_RECOVERY
